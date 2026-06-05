@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    hikari:
+      # Supabase transaction pooler (PgBouncer) closes idle connections after ~300s.
+      # max-lifetime must be shorter so Hikari never hands out a connection the server
+      # already dropped, preventing "Connection is not available" errors.
+      maximum-pool-size: 5
+      minimum-idle: 2
+      max-lifetime: 240000        # 4 min — safely below Supabase's 5-min idle cutoff
+      keepalive-time: 120000      # 2 min — periodic no-op query to keep connection alive
+      connection-timeout: 10000   # 10 s before giving up acquiring from pool
+      idle-timeout: 180000        # 3 min before evicting idle connections
+      connection-test-query: SELECT 1
+
+  jpa:
+    show-sql: false
