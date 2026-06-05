@@ -19,6 +19,7 @@ import java.util.UUID;
 public class WorkerService {
 
     private final WorkerRepository workerRepository;
+    private final ActiveWorkerCache activeWorkerCache;
 
     @Transactional
     public WorkerResponse create(CreateWorkerRequest req) {
@@ -51,8 +52,10 @@ public class WorkerService {
         if (req.getDesignation() != null) worker.setDesignation(req.getDesignation());
         if (req.getDailyWageRate() != null) worker.setDailyWageRate(req.getDailyWageRate());
         if (req.getActive() != null) worker.setActive(req.getActive());
-        // NOTE: cache invalidation of any active entry for this worker is added in the Redis phase.
-        return WorkerResponse.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        // Invalidate/refresh any cached active entry so /active never serves stale name/designation.
+        activeWorkerCache.refreshWorker(saved);
+        return WorkerResponse.from(saved);
     }
 
     /** Shared lookup used by attendance/overtime services. */

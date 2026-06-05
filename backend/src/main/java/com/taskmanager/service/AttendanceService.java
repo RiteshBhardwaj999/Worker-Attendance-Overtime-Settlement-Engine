@@ -35,6 +35,7 @@ public class AttendanceService {
     private final WorkerService workerService;
     private final SiteService siteService;
     private final OvertimeCalculator overtimeCalculator;
+    private final ActiveWorkerCache activeWorkerCache;
 
     @Transactional
     public AttendanceResponse clockIn(ClockInRequest req) {
@@ -64,7 +65,7 @@ public class AttendanceService {
                 .flagged(false)
                 .build();
         AttendanceLog saved = attendanceRepository.save(log);
-        // NOTE: the Redis active-workers store is wired in the cache phase.
+        activeWorkerCache.markActive(saved);
         return AttendanceResponse.from(saved);
     }
 
@@ -96,7 +97,7 @@ public class AttendanceService {
         if (rawOvertime.signum() > 0) {
             recordOvertime(worker, log, clockOutTime.toLocalDate(), rawOvertime);
         }
-        // NOTE: the Redis active-workers store eviction is wired in the cache phase.
+        activeWorkerCache.removeActive(worker.getId());
         return AttendanceResponse.from(log);
     }
 
@@ -136,11 +137,9 @@ public class AttendanceService {
 
     // ---- reads ----
 
-    /** v1: served from the database. Moves to Redis in the cache phase. */
+    /** Served exclusively from Redis, never the database. */
     public List<ActiveWorkerResponse> getActiveWorkers() {
-        return attendanceRepository.findByClockOutTimeIsNull().stream()
-                .map(ActiveWorkerResponse::from)
-                .toList();
+        return activeWorkerCache.getActiveWorkers();
     }
 
     /** v1: unpaginated; relations are EAGER so this triggers N+1. Hardened in LF-203. */
