@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "maven", "jdk17"]
+nixArchive = "https://github.com/NixOS/nixpkgs/archive/nixos-24.11.tar.gz"
+
+[phases.build]
+cmds = [
+  "cd frontend && npm install && npm run build && cp -r dist/. ../backend/src/main/resources/static/",
+  "cd backend && mvn clean package -DskipTests"
+]
+
+[start]
+cmd = "java $JAVA_OPTS -jar backend/target/*.jar"
