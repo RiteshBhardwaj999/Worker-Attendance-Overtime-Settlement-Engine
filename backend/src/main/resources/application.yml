@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: worker-attendance-overtime-engine
+
+  datasource:
+    # Supabase requires SSL; prepareThreshold=0 disables server-side prepared
+    # statements, which PgBouncer transaction-mode pooling (port 6543) cannot reuse.
+    url: "jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:postgres}?sslmode=require&prepareThreshold=0"
+    username: ${PGUSER:${DB_USERNAME:postgres}}
+    password: ${PGPASSWORD:${DB_PASSWORD:postgres}}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+server:
+  port: ${PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET:devSecretKeyMustBeAtLeast32CharactersLong!!}
+  expiration: 86400000
