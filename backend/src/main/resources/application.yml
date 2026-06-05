@@ -27,6 +27,10 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        command-timeout: 1500ms
+        shutdown-timeout: 100ms
 
   cache:
     type: redis
@@ -37,3 +41,8 @@ server:
 jwt:
   secret: ${JWT_SECRET:devSecretKeyMustBeAtLeast32CharactersLong!!}
   expiration: 86400000
+
+app:
+  cors:
+    # Externalized per environment (comma-separated). Dev defaults to the React app.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}

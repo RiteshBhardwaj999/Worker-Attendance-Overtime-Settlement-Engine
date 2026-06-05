@@ -4,7 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -17,19 +21,10 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 
-/**
- * Redis wiring for the attendance/overtime engine.
- *
- * Two consumers:
- *  - {@code redisTemplate} -> the active-workers store (manual hash/key operations).
- *  - {@code cacheManager}  -> Spring @Cacheable/@CacheEvict for worker/overtime data.
- *
- * Both use a JSON serializer that understands java.time types (clock-in/out
- * timestamps) and retains type info so cached POJOs round-trip cleanly.
- */
 @Configuration
 @EnableCaching
-public class RedisConfig {
+@Slf4j
+public class RedisConfig implements CachingConfigurer {
 
     private GenericJackson2JsonRedisSerializer jsonSerializer() {
         ObjectMapper mapper = new ObjectMapper();
@@ -65,5 +60,31 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(jsonSerializer()));
         return RedisCacheManager.builder(connectionFactory).cacheDefaults(config).build();
+    }
+
+    /**
+     * Never let a Redis outage crash the application. Log and degrade gracefully —
+     * the live path (DB or direct Redis calls with their own try/catch) takes over.
+     */
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException e, Cache cache, Object key) {
+                log.warn("Cache GET failed [cache={}, key={}]: {}", cache.getName(), key, e.getMessage());
+            }
+            @Override
+            public void handleCachePutError(RuntimeException e, Cache cache, Object key, Object value) {
+                log.warn("Cache PUT failed [cache={}, key={}]: {}", cache.getName(), key, e.getMessage());
+            }
+            @Override
+            public void handleCacheEvictError(RuntimeException e, Cache cache, Object key) {
+                log.warn("Cache EVICT failed [cache={}, key={}]: {}", cache.getName(), key, e.getMessage());
+            }
+            @Override
+            public void handleCacheClearError(RuntimeException e, Cache cache) {
+                log.warn("Cache CLEAR failed [cache={}]: {}", cache.getName(), e.getMessage());
+            }
+        };
     }
 }
