@@ -5,7 +5,7 @@ spring:
   datasource:
     # Supabase requires SSL; prepareThreshold=0 disables server-side prepared
     # statements, which PgBouncer transaction-mode pooling (port 6543) cannot reuse.
-    url: "jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:postgres}?sslmode=require&prepareThreshold=0"
+    url: "jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:postgres}?sslmode=disable&prepareThreshold=0"
     username: ${PGUSER:${DB_USERNAME:postgres}}
     password: ${PGPASSWORD:${DB_PASSWORD:postgres}}
     driver-class-name: org.postgresql.Driver
