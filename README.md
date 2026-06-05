@@ -184,21 +184,3 @@ GitHub Copilot and Claude were used for boilerplate acceleration (entity stubs, 
 
 ---
 
-## Architecture Diagram
-
-*(Hand-drawn diagram attached as per submission requirement)*
-
-Key components:
-```
-React Frontend
-      |
-  JWT Auth
-      |
-Spring Boot (Controllers -> Services -> Repositories)
-      |              |
-  PostgreSQL      Redis
-  (Supabase)   (Active Workers Cache)
-      |
-  @Scheduled Sweeper (stale open shifts)
-  ApplicationEventPublisher (SMS after commit)
-```
