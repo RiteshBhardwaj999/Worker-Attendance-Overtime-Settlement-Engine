@@ -15,6 +15,9 @@ public interface AttendanceLogRepository extends JpaRepository<AttendanceLog, UU
 
     boolean existsByWorker_IdAndClockOutTimeIsNull(UUID workerId);
 
+    /** All currently-open attendance records (everyone on-site right now). */
+    List<AttendanceLog> findByClockOutTimeIsNull();
+
     /** Attendance history for a worker within a clock-in date range (v1: unpaginated). */
     List<AttendanceLog> findByWorker_IdAndClockInTimeBetween(UUID workerId, LocalDateTime from, LocalDateTime to);
 }
