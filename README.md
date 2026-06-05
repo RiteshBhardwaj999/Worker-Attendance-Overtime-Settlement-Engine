@@ -130,8 +130,8 @@ Clock-in payload (`clockInTime` optional — defaults to now):
 ### Overtime
 
 ```
-GET  /api/overtime/{workerId}/summary?month=2025-05    — monthly summary + minimum wage ref
-POST /api/overtime/{workerId}/settle?month=2025-05     — mark all pending entries settled
+GET  /api/overtime/summary/{workerId}?month=2025-05    — monthly summary + minimum wage ref
+POST /api/overtime/settle/{workerId}?month=2025-05     — mark all pending entries settled
 ```
 
 ### Health
