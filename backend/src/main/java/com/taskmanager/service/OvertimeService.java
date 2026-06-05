@@ -6,10 +6,12 @@ import com.taskmanager.dto.response.SettlementResponse;
 import com.taskmanager.entity.OvertimeEntry;
 import com.taskmanager.entity.Worker;
 import com.taskmanager.enums.SettlementStatus;
+import com.taskmanager.event.OvertimeSettledEvent;
 import com.taskmanager.exception.ApiException;
 import com.taskmanager.exception.ErrorCode;
 import com.taskmanager.repository.OvertimeEntryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +29,17 @@ public class OvertimeService {
     private final OvertimeEntryRepository overtimeRepository;
     private final WorkerService workerService;
     private final MinimumWageClient minimumWageClient;
-    private final SmsService smsService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    @Transactional(readOnly = true)
+    /**
+     * LF-205: external HTTP call happens BEFORE the transaction is opened so no DB
+     * connection is held during the network round-trip. The method itself is NOT
+     * @Transactional; the repository calls each acquire their own short transactions.
+     */
     public OvertimeSummaryResponse getSummary(UUID workerId, YearMonth month) {
         Worker worker = workerService.getWorkerOrThrow(workerId);
 
-        // v1: external call sits INSIDE the transaction, holding a DB connection (fixed in LF-205).
+        // External call outside of any transaction — DB connection not held here.
         BigDecimal minimumDailyWage = minimumWageClient.getDailyMinimumWage();
 
         LocalDate start = month.atDay(1);
@@ -63,10 +69,11 @@ public class OvertimeService {
     }
 
     /**
-     * v1: NOT annotated @Transactional, so each save() commits on its own — a failure
-     * mid-loop leaves a partially-settled month. The SMS is also fired inline (before the
-     * data is durably committed). Both are fixed in LF-204.
+     * LF-204: the entire loop runs in a single transaction so a mid-loop failure
+     * rolls back all updates atomically. The SMS fires via an event after commit,
+     * never inside the transaction.
      */
+    @Transactional
     public SettlementResponse settle(UUID workerId, YearMonth month) {
         Worker worker = workerService.getWorkerOrThrow(workerId);
 
@@ -89,12 +96,11 @@ public class OvertimeService {
 
         BigDecimal total = pending.stream().map(OvertimeEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        for (OvertimeEntry entry : pending) {
-            entry.setSettlementStatus(SettlementStatus.SETTLED);
-            overtimeRepository.save(entry);
-        }
+        pending.forEach(entry -> entry.setSettlementStatus(SettlementStatus.SETTLED));
+        overtimeRepository.saveAll(pending);
 
-        smsService.send(worker, "Your " + month + " overtime of Rs " + total + " has been settled.");
+        // Published after commit — SmsNotificationListener fires only when data is durable.
+        eventPublisher.publishEvent(new OvertimeSettledEvent(worker, month.toString(), total, pending.size()));
 
         return new SettlementResponse(workerId, month.toString(), total, pending.size(), SettlementStatus.SETTLED);
     }
