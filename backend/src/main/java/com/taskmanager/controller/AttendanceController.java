@@ -4,9 +4,12 @@ import com.taskmanager.dto.request.ClockInRequest;
 import com.taskmanager.dto.request.ClockOutRequest;
 import com.taskmanager.dto.response.ActiveWorkerResponse;
 import com.taskmanager.dto.response.AttendanceResponse;
+import com.taskmanager.dto.response.PagedResponse;
 import com.taskmanager.service.AttendanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,10 +42,13 @@ public class AttendanceController {
     }
 
     @GetMapping("/log")
-    public ResponseEntity<List<AttendanceResponse>> log(
+    public ResponseEntity<PagedResponse<AttendanceResponse>> log(
             @RequestParam(required = false) UUID workerId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(attendanceService.getLog(workerId, from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
+        return ResponseEntity.ok(attendanceService.getLog(workerId, from, to, pageable));
     }
 }

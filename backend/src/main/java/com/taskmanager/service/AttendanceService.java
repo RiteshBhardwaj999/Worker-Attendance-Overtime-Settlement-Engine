@@ -4,6 +4,7 @@ import com.taskmanager.dto.request.ClockInRequest;
 import com.taskmanager.dto.request.ClockOutRequest;
 import com.taskmanager.dto.response.ActiveWorkerResponse;
 import com.taskmanager.dto.response.AttendanceResponse;
+import com.taskmanager.dto.response.PagedResponse;
 import com.taskmanager.entity.AttendanceLog;
 import com.taskmanager.entity.OvertimeEntry;
 import com.taskmanager.entity.Site;
@@ -14,6 +15,7 @@ import com.taskmanager.exception.ErrorCode;
 import com.taskmanager.repository.AttendanceLogRepository;
 import com.taskmanager.repository.OvertimeEntryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -142,16 +144,18 @@ public class AttendanceService {
         return activeWorkerCache.getActiveWorkers();
     }
 
-    /** v1: unpaginated; relations are EAGER so this triggers N+1. Hardened in LF-203. */
-    public List<AttendanceResponse> getLog(UUID workerId, LocalDate from, LocalDate to) {
-        List<AttendanceLog> logs;
+    /** Paginated with JOIN FETCH; eliminates the N+1 that the v1 EAGER mapping caused (LF-203). */
+    @Transactional(readOnly = true)
+    public PagedResponse<AttendanceResponse> getLog(UUID workerId, LocalDate from, LocalDate to, Pageable pageable) {
         if (workerId == null) {
-            logs = attendanceRepository.findAll();
-        } else {
-            LocalDateTime fromTs = (from != null ? from : LocalDate.of(2000, 1, 1)).atStartOfDay();
-            LocalDateTime toTs = (to != null ? to : LocalDate.now()).atTime(LocalTime.MAX);
-            logs = attendanceRepository.findByWorker_IdAndClockInTimeBetween(workerId, fromTs, toTs);
+            return PagedResponse.of(
+                    attendanceRepository.findAllLogPaged(pageable)
+                            .map(AttendanceResponse::from));
         }
-        return logs.stream().map(AttendanceResponse::from).toList();
+        LocalDateTime fromTs = (from != null ? from : LocalDate.of(2000, 1, 1)).atStartOfDay();
+        LocalDateTime toTs = (to != null ? to : LocalDate.now()).atTime(LocalTime.MAX);
+        return PagedResponse.of(
+                attendanceRepository.findLogByWorkerPaged(workerId, fromTs, toTs, pageable)
+                        .map(AttendanceResponse::from));
     }
 }
